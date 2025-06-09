@@ -1,0 +1,6 @@
+latent_dim: 168
+learning_rate: 0.0003141676237754755
+k: 3
+num_epochs: 94
+batch_size: 242
+lambda: 14.40851156880087
