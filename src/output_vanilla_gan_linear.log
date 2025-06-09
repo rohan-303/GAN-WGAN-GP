@@ -1,7 +1,0 @@
-nohup: ignoring input
-pyenv: invalid version `/home/careinfolab/Dr_Luo/Rohan/rohanj/bin/python' ignored in `/home/careinfolab/Dr_Luo/Rohan/.python-version'
-pyenv: invalid version `/home/careinfolab/Dr_Luo/Rohan/rohanj/bin/python' ignored in `/home/careinfolab/Dr_Luo/Rohan/.python-version'
-Traceback (most recent call last):
-  File "Vanilla_GAN_Linear.py", line 7, in <module>
-    import torchvision
-ModuleNotFoundError: No module named 'torchvision'
