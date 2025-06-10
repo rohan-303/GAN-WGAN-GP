@@ -1,7 +1,8 @@
-latent_dim: 237
-hidden_dim: 157
-num_layers: 5
-learning_rate: 0.00020227984753882163
-k: 4
-num_epochs: 54
-batch_size: 116
+latent_dim: 233
+hidden_dim: 84
+num_layers_g: 6
+num_layers_d: 3
+learning_rate: 0.0003636331984626004
+k: 2
+num_epochs: 143
+batch_size: 128

@@ -22,15 +22,16 @@ channels_dim = 1
 
 def objective(trial):
     latent_dim = trial.suggest_int("latent_dim", 64, 256)
-    hidden_dim = trial.suggest_int("hidden_dim", 64, 256)
-    num_layers = trial.suggest_int("num_layers", 3, 10)
+    hidden_dim = trial.suggest_int("hidden_dim", 32, 128)
+    num_layers_g = trial.suggest_int("num_layers_g", 3, 10)
+    num_layers_d = trial.suggest_int("num_layers_d", 2, 4)
     learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
-    k = trial.suggest_int("k", 3, 6)
-    num_epochs = trial.suggest_int("num_epochs", 50, 150)
-    batch_size = trial.suggest_int("batch_size", 32, 256)
+    k = trial.suggest_int("k", 2, 3)
+    num_epochs = trial.suggest_int("num_epochs", 140, 150)
+    batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
     dataloader = DataLoader(torchvision.datasets.MNIST(root=dataset_path,train=True,download=True,transform=transform),batch_size=batch_size,shuffle=True,num_workers=4,pin_memory=True)
-    generator = LinearGenerator(latent_dim=latent_dim, output_dim=pixels, hidden_dim=hidden_dim, num_layers=num_layers,channels_dim=channels_dim).to(device)
-    discriminator = LinearDiscriminator(hidden_dim=hidden_dim, num_layers=3,in_dim=pixels*channels_dim).to(device)
+    generator = LinearGenerator(latent_dim=latent_dim, output_dim=pixels, hidden_dim=hidden_dim, num_layers=num_layers_g,channels_dim=channels_dim).to(device)
+    discriminator = LinearDiscriminator(hidden_dim=hidden_dim, num_layers=num_layers_d,in_dim=pixels*channels_dim).to(device)
 
     _, loss_g = train(generator, discriminator, latent_dim, dataloader=dataloader, num_epochs=num_epochs, lr=learning_rate, device=device,k=k,results_path=results_path)
     return sum(loss_g[-10:]) / 10
@@ -45,13 +46,13 @@ with open(os.path.join(results_path, "best_params.txt"), "w") as f:
     for key, val in best_params.items():
         f.write(f"{key}: {val}\n")
 
-best_generator = LinearGenerator(latent_dim=best_params["latent_dim"],output_dim=pixels,hidden_dim=best_params["hidden_dim"],num_layers=best_params["num_layers"],channels_dim=channels_dim).to(device)
+best_generator = LinearGenerator(latent_dim=best_params["latent_dim"],output_dim=pixels,hidden_dim=best_params["hidden_dim"],num_layers=best_params["num_layers_g"],channels_dim=channels_dim).to(device)
 
-best_discriminator = LinearDiscriminator(hidden_dim=best_params["hidden_dim"],num_layers=best_params["num_layers"],in_dim=pixels*channels_dim).to(device)
+best_discriminator = LinearDiscriminator(hidden_dim=best_params["hidden_dim"],num_layers=best_params["num_layers_d"],in_dim=pixels*channels_dim).to(device)
 
 best_dataloader = DataLoader(torchvision.datasets.MNIST(root=dataset_path,train=True,download=True,transform=transform),batch_size=best_params["batch_size"],shuffle=True, num_workers=4,pin_memory=True)
 
-train_loss_d, train_loss_g = train(best_generator, best_discriminator,latent_dim=best_params["latent_dim"],dataloader=best_dataloader,num_epochs=best_params["num_epochs"],lr=best_params["learning_rate"],device=device,k=5,results_path=results_path)
+train_loss_d, train_loss_g = train(best_generator, best_discriminator,latent_dim=best_params["latent_dim"],dataloader=best_dataloader,num_epochs=best_params["num_epochs"],lr=best_params["learning_rate"],device=device,k=best_params['k'],results_path=results_path)
 
 torch.save(best_generator.state_dict(), os.path.join(results_path, "generator.pth"))
 torch.save(best_discriminator.state_dict(), os.path.join(results_path, "discriminator.pth"))

@@ -13,13 +13,18 @@ class LinearGenerator(nn.Module):
     def __init__(self, latent_dim, output_dim, hidden_dim=128, num_layers=3, channels_dim=1):
         super(LinearGenerator, self).__init__()
         self.channels_dim = channels_dim
-        layers = []
         self.side_length = int(math.sqrt(output_dim))
+
+        layers = []
         in_dim = latent_dim
-        for _ in range(num_layers - 1):
+
+        for i in range(num_layers - 1):
             layers.append(nn.Linear(in_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            in_dim = hidden_dim  
+            if i != 0:
+                layers.append(nn.BatchNorm1d(hidden_dim, 0.8))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            in_dim = hidden_dim
+            hidden_dim = min(hidden_dim * 2, 1024)
 
         layers.append(nn.Linear(in_dim, output_dim))
         layers.append(nn.Tanh())
@@ -27,17 +32,18 @@ class LinearGenerator(nn.Module):
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):
-        return self.net(x)
-        #return self.net(x).view(-1, self.channels_dim, self.side_length, self.side_length)
+        return self.net(x).view(-1, self.channels_dim, self.side_length, self.side_length)
     
 class LinearCritic(nn.Module):
-    def __init__(self, in_dim, hidden_dim=128, num_layers=3):
+    def __init__(self, in_dim, hidden_dim=512, num_layers=3):
         super(LinearCritic, self).__init__()
         layers = []
-        for _ in range(num_layers - 1):
+
+        for i in range(num_layers - 1):
             layers.append(nn.Linear(in_dim, hidden_dim))
-            layers.append(nn.ReLU())
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
             in_dim = hidden_dim
+            hidden_dim = hidden_dim // 2  
 
         layers.append(nn.Linear(in_dim, 1))
 
@@ -152,7 +158,8 @@ def train(generator, critic, latent_dim, dataloader, num_epochs, lr, lam, device
             optimizer_C.zero_grad()
             C_real = C(real_imgs)
             if isLinear:
-                C_fake = C(fake_imgs.view(batch_size, -1))
+                fake_imgs = fake_imgs.view(batch_size, -1)
+                C_fake = C(fake_imgs)
             else:
                 C_fake = C(fake_imgs)
             loss_C = -torch.mean(C_real) + torch.mean(C_fake) +  lam * gradient_penalty(C, real_imgs, fake_imgs.detach(), device)
@@ -182,6 +189,7 @@ def train(generator, critic, latent_dim, dataloader, num_epochs, lr, lam, device
             with torch.no_grad():
                 sample_z = torch.randn(64, latent_dim).to(device)
                 fake_imgs = G(sample_z)
+                #fake_imgs = (fake_imgs+1)/2  # Rescale to [0, 1]
                 save_generated_images(fake_imgs, epoch + 1,folder=results_path+'/generated_images')
 
     return train_loss_C, train_loss_g

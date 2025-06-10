@@ -15,13 +15,18 @@ class LinearGenerator(nn.Module):
     def __init__(self, latent_dim, output_dim, hidden_dim=128, num_layers=3, channels_dim=1):
         super(LinearGenerator, self).__init__()
         self.channels_dim = channels_dim
-        layers = []
         self.side_length = int(math.sqrt(output_dim))
+
+        layers = []
         in_dim = latent_dim
-        for _ in range(num_layers - 1):
+
+        for i in range(num_layers - 1):
             layers.append(nn.Linear(in_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            in_dim = hidden_dim  
+            if i != 0:
+                layers.append(nn.BatchNorm1d(hidden_dim, 0.8))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            in_dim = hidden_dim
+            hidden_dim = min(hidden_dim * 2, 1024)
 
         layers.append(nn.Linear(in_dim, output_dim))
         layers.append(nn.Tanh())
@@ -32,13 +37,15 @@ class LinearGenerator(nn.Module):
         return self.net(x).view(-1, self.channels_dim, self.side_length, self.side_length)
 
 class LinearDiscriminator(nn.Module):
-    def __init__(self,in_dim,hidden_dim=128,num_layers=1):
+    def __init__(self, in_dim, hidden_dim=512, num_layers=3):
         super(LinearDiscriminator, self).__init__()
         layers = []
-        for _ in range(num_layers - 1):
+
+        for i in range(num_layers - 1):
             layers.append(nn.Linear(in_dim, hidden_dim))
-            layers.append(nn.ReLU())
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
             in_dim = hidden_dim
+            hidden_dim = hidden_dim // 2  
 
         layers.append(nn.Linear(in_dim, 1))
         layers.append(nn.Sigmoid())
@@ -47,6 +54,7 @@ class LinearDiscriminator(nn.Module):
 
     def forward(self, x):
         return self.net(x)
+
     
 class DCGenerator(nn.Module):
     def __init__(self, latent_dim=100, im_chan=1, hidden_dim=64):
@@ -124,10 +132,12 @@ def train(generator, discriminator, latent_dim, dataloader, num_epochs, lr, devi
             batch_size = real_imgs.size(0)
             if isLinear:
                 real_imgs = real_imgs.view(batch_size, -1).to(device)
+                #print(real_imgs.shape)
+                #print(real_imgs[1])
             else:
                 real_imgs = real_imgs.to(device)    
-            real_labels = torch.full((batch_size, 1), 0.9).to(device)  # not 1.0
-            fake_labels = torch.full((batch_size, 1), 0.1).to(device)  # not 0.0
+            real_labels = torch.full((batch_size, 1), 1.0).to(device)  # not 1.0
+            fake_labels = torch.full((batch_size, 1), 0.0).to(device)  # not 0.0
 
 
             z = torch.randn(batch_size, latent_dim).to(device)
@@ -149,12 +159,14 @@ def train(generator, discriminator, latent_dim, dataloader, num_epochs, lr, devi
             if step % k == 0:
                 optimizer_G.zero_grad()
                 fake_imgs = G(z)
+                
                 if isLinear:
                     D_fake = D(fake_imgs.view(batch_size, -1))
                 else:
-                    D_fake = D(fake_imgs) 
+                    D_fake = D(fake_imgs)
 
-                loss_G = -torch.mean(torch.log(D_fake + 1e-8)) 
+                #loss_G = -torch.mean(torch.log(D_fake + 1e-8))
+                loss_G = criterion(D_fake, real_labels) 
                 loss_G.backward()
                 optimizer_G.step()
                 train_loss_g.append(loss_G.item())
@@ -168,6 +180,7 @@ def train(generator, discriminator, latent_dim, dataloader, num_epochs, lr, devi
             with torch.no_grad():
                 sample_z = torch.randn(64, latent_dim).to(device)
                 fake_imgs = G(sample_z)
+                #fake_imgs = (fake_imgs + 1) / 2 # Rescale to [0, 1]
                 save_generated_images(fake_imgs, epoch + 1,folder=results_path+'/generated_images')
 
     return train_loss_d, train_loss_g
